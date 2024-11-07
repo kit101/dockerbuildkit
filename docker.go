@@ -3,6 +3,7 @@ package docker
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -138,6 +139,26 @@ func (p Plugin) Exec() error {
 		time.Sleep(time.Second * 1)
 	}
 
+	// create buildx instance
+	createBuildxInstanceCmd := commandCreateBuildxInstance(p.Build)
+	createBuildxInstanceCmd.Stdout = io.Discard
+	createBuildxInstanceCmd.Stderr = os.Stderr
+	trace(createBuildxInstanceCmd)
+	err := createBuildxInstanceCmd.Run()
+	if err != nil {
+		return fmt.Errorf("can't create buildx builder instance: %w", err)
+	}
+
+	// load buildkit image
+	loadBuildkitImageCmd := commandLoadBuildkitImage()
+	trace(loadBuildkitImageCmd)
+	loadBuildkitImageCmd.Stdout = io.Discard
+	loadBuildkitImageCmd.Stderr = os.Stderr
+	err = loadBuildkitImageCmd.Run()
+	if err != nil {
+		fmt.Printf("Can't load buildkit image from location: %s\n", buildkitImageTarPath)
+	}
+
 	// for debugging purposes, log the type of authentication
 	// credentials that have been provided.
 	switch {
@@ -225,8 +246,9 @@ func (p Plugin) Exec() error {
 	addProxyBuildArgs(&p.Build)
 
 	var cmds []*exec.Cmd
-	cmds = append(cmds, commandVersion()) // docker version
-	cmds = append(cmds, commandInfo())    // docker info
+	cmds = append(cmds, commandVersion())               // docker version
+	cmds = append(cmds, commandInfo())                  // docker info
+	cmds = append(cmds, commandInspectBuildxInstance()) // buildx instance inspect
 
 	// pre-pull cache images
 	for _, img := range p.Build.CacheFrom {
@@ -242,14 +264,11 @@ func (p Plugin) Exec() error {
 		}
 	}
 
-	cmds = append(cmds, commandBuild(p.Build)) // docker build
+	cmds = append(cmds, commandBuild(p.Build, p.Build.TempTag, true)) // docker build
 
 	for _, tag := range p.Build.Tags {
-		cmds = append(cmds, commandTag(p.Build, tag)) // docker tag
-
-		if !p.Dryrun {
-			cmds = append(cmds, commandPush(p.Build, tag)) // docker push
-		}
+		imageName := fmt.Sprintf("%s:%s", p.Build.Repo, tag)
+		cmds = append(cmds, commandBuild(p.Build, imageName, p.Dryrun)) // docker tag
 	}
 
 	// execute all commands in batch mode.
@@ -386,12 +405,12 @@ func commandInfo() *exec.Cmd {
 }
 
 // helper function to create the docker build command.
-func commandBuild(build Build) *exec.Cmd {
+func commandBuild(build Build, tag string, dryRun bool) *exec.Cmd {
 	args := []string{
 		"build",
 		"--rm=true",
 		"-f", build.Dockerfile,
-		"-t", build.TempTag,
+		"-t", tag,
 	}
 
 	args = append(args, build.Context)
@@ -473,7 +492,11 @@ func commandBuild(build Build) *exec.Cmd {
 	if build.Secret != "" || len(build.SecretEnvs) > 0 || len(build.SecretFiles) > 0 || build.SSHAgentKey != "" {
 		os.Setenv("DOCKER_BUILDKIT", "1")
 	}
-	return exec.Command(dockerExe, args...)
+
+	if !dryRun {
+		args = append(args, "--push")
+	}
+	return exec.Command(buildxExe, args...)
 }
 
 func getSecretStringCmdArg(kvp string) (string, error) {
@@ -668,4 +691,29 @@ func getDigest(buildName string) (string, error) {
 		return parts[1], nil
 	}
 	return "", errors.New("unable to fetch digest")
+}
+
+func commandCreateBuildxInstance(build Build) *exec.Cmd {
+	//buildx create --name mybuilder --driver docker-container --use --platform linux/amd64,linux/arm64
+	args := []string{
+		"create",
+		"--name", builderName,
+		"--driver", "docker-container",
+		"--use",
+	}
+	if build.Platform != "" {
+		args = append(args, "--platform", build.Platform)
+	}
+	return exec.Command(buildxExe, args...)
+}
+
+func commandInspectBuildxInstance() *exec.Cmd {
+	args := []string{
+		"inspect", builderName,
+	}
+	return exec.Command(buildxExe, args...)
+}
+
+func commandLoadBuildkitImage() *exec.Cmd {
+	return exec.Command(dockerExe, "load", "-i", buildkitImageTarPath)
 }

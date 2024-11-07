@@ -11,6 +11,9 @@ import (
 const dockerExe = "/usr/local/bin/docker"
 const dockerdExe = "/usr/local/bin/dockerd"
 const dockerHome = "/root/.docker/"
+const buildxExe = "/usr/local/bin/buildx"
+const builderName = "default_builder"
+const buildkitImageTarPath = "/tmp/moby-buildkit-buildx-stable.tar"
 
 func (p Plugin) startDaemon() {
 	cmd := commandDaemon(p.Daemon)
