@@ -54,8 +54,12 @@ func main() {
 		cli.StringFlag{
 			Name:   "daemon.mirror",
 			Usage:  "docker daemon registry mirror. Multiple mirrors are separated by commas ','",
-			EnvVar: "PLUGIN_MIRRORS,PLUGIN_MIRROR,DOCKER_PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRROR",
-			//EnvVar: "PLUGIN_MIRROR,PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRROR,DOCKER_PLUGIN_MIRRORS",
+			EnvVar: "PLUGIN_MIRROR,DOCKER_PLUGIN_MIRROR",
+		},
+		cli.StringSliceFlag{
+			Name:   "daemon.mirrors",
+			Usage:  "multiple docker daemon registry mirrors, separated by commas",
+			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
 		},
 		cli.StringFlag{
 			Name:   "daemon.storage-driver",
@@ -383,6 +387,7 @@ func run(c *cli.Context) error {
 		Daemon: docker.Daemon{
 			Registry:      c.String("docker.registry"),
 			Mirror:        c.String("daemon.mirror"),
+			Mirrors:       c.StringSlice("daemon.mirrors"),
 			StorageDriver: c.String("daemon.storage-driver"),
 			StoragePath:   c.String("daemon.storage-path"),
 			Insecure:      c.Bool("daemon.insecure"),
