@@ -91,8 +91,10 @@ jobs:
             latest=false
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=raw,value=test,prefix=ci/,enable=true
+            type=semver,pattern={{major}}.{{minor}}.{{patch}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+#            type=raw,value=test,prefix=ci/,enable=true
 
       # Print artifacts and environment variables
       - name: Print env
