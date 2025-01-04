@@ -19,6 +19,7 @@ type (
 	Daemon struct {
 		Registry      string             // Docker registry
 		Mirror        string             // Docker registry mirror
+		Mirrors       []string           // Docker registry mirrors
 		Insecure      bool               // Docker daemon enable insecure registries
 		StorageDriver string             // Docker daemon storage driver
 		StoragePath   string             // Docker daemon storage path
@@ -608,8 +609,10 @@ func commandDaemon(daemon Daemon) *exec.Cmd {
 		args = append(args, "--ipv6")
 	}
 	if len(daemon.Mirror) != 0 {
-		mirrors := strings.Split(daemon.Mirror, ",")
-		for _, mirror := range mirrors {
+		args = append(args, "--registry-mirror", daemon.Mirror)
+	}
+	if len(daemon.Mirrors) != 0 {
+		for _, mirror := range daemon.Mirrors {
 			args = append(args, "--registry-mirror", mirror)
 		}
 	}
