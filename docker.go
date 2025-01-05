@@ -609,7 +609,7 @@ func commandDaemon(daemon Daemon) *exec.Cmd {
 		args = append(args, "--ipv6")
 	}
 	if len(daemon.Mirror) != 0 {
-		fmt.Fprintf(os.Stdout, "!!! warning: `daemon.mirror` is deprecated and should be replaced with `daemon.mirrors`")
+		fmt.Fprintf(os.Stdout, "!!! warning: `daemon.mirror` is deprecated and should be replaced with `daemon.mirrors`\n")
 		daemon.Mirrors = append(daemon.Mirrors, daemon.Mirror)
 	}
 	if len(daemon.Mirrors) != 0 {
