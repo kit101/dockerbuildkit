@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -624,66 +623,6 @@ func hasProxyBuildArgNew(build *Build, key string) bool {
 	return false
 }
 
-// helper function to create the docker tag command.
-func commandTag(build Build, tag string) *exec.Cmd {
-	var (
-		source = build.TempTag
-		target = fmt.Sprintf("%s:%s", build.Repo, tag)
-	)
-	return exec.Command(
-		dockerExe, "tag", source, target,
-	)
-}
-
-// helper function to create the docker push command.
-func commandPush(build Build, tag string) *exec.Cmd {
-	target := fmt.Sprintf("%s:%s", build.Repo, tag)
-	return exec.Command(dockerExe, "push", target)
-}
-
-// helper function to create the docker daemon command.
-func commandDaemon(daemon Daemon) *exec.Cmd {
-	args := []string{
-		"--data-root", daemon.StoragePath,
-		"--host=unix:///var/run/docker.sock",
-	}
-
-	if _, err := os.Stat("/etc/docker/default.json"); err == nil {
-		args = append(args, "--seccomp-profile=/etc/docker/default.json")
-	}
-
-	if daemon.StorageDriver != "" {
-		args = append(args, "-s", daemon.StorageDriver)
-	}
-	if daemon.Insecure && daemon.Registry != "" {
-		args = append(args, "--insecure-registry", daemon.Registry)
-	}
-	if daemon.IPv6 {
-		args = append(args, "--ipv6")
-	}
-	if len(daemon.Mirrors) > 0 {
-		for _, mirror := range daemon.Mirrors {
-			args = append(args, "--registry-mirror", mirror)
-		}
-	}
-	if len(daemon.Bip) != 0 {
-		args = append(args, "--bip", daemon.Bip)
-	}
-	for _, dns := range daemon.DNS {
-		args = append(args, "--dns", dns)
-	}
-	for _, dnsSearch := range daemon.DNSSearch {
-		args = append(args, "--dns-search", dnsSearch)
-	}
-	if len(daemon.MTU) != 0 {
-		args = append(args, "--mtu", daemon.MTU)
-	}
-	if daemon.Experimental {
-		args = append(args, "--experimental")
-	}
-	return exec.Command(dockerdExe, args...)
-}
-
 // helper to check if args match "docker prune"
 func isCommandPrune(args []string) bool {
 	return len(args) > 3 && args[2] == "prune"
@@ -731,14 +670,6 @@ func traceRun(cmd *exec.Cmd, stdout io.Writer) error {
 	cmd.Stderr = os.Stderr
 	trace(cmd)
 	return cmd.Run()
-}
-
-func GetDroneDockerExecCmd() string {
-	if runtime.GOOS == "windows" {
-		return "C:/bin/drone-docker.exe"
-	}
-
-	return "drone-docker"
 }
 
 func getDigest(buildName string) (string, error) {
