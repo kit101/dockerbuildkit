@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -80,6 +81,11 @@ func generateBuildkitdConfig(mirrors []string, path string) error {
 		},
 	}
 	tomlBytes, err := toml.Marshal(c)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	err = os.MkdirAll(dir, 0644)
 	if err != nil {
 		return err
 	}
