@@ -1,19 +1,23 @@
 //go:build !windows
 // +build !windows
 
-package docker
+package dockerbuildkit
 
 import (
 	"io"
 	"os"
+	"path/filepath"
 )
 
 const dockerExe = "/usr/local/bin/docker"
 const dockerdExe = "/usr/local/bin/dockerd"
 const dockerHome = "/root/.docker/"
-const buildxExe = "/usr/local/bin/buildx"
-const builderName = "default_builder"
-const buildkitImageTarPath = "/tmp/moby-buildkit-buildx-stable.tar"
+const BuildkitdHomeEnvName = "BUILDKITD_HOME"
+const DefaultBuildkitdConfigPath = "/run/buildkit/buildkitd.toml"
+
+func buildkitdCachePath() string {
+	return filepath.Join(os.Getenv(BuildkitdHomeEnvName), "cache/%s")
+}
 
 func (p Plugin) startDaemon() {
 	cmd := commandDaemon(p.Daemon)

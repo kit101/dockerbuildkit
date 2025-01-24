@@ -1,4 +1,4 @@
-package docker
+package dockerbuildkit
 
 import (
 	"encoding/base64"
