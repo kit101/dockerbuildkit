@@ -258,10 +258,11 @@ func (p Plugin) Exec() error {
 	addProxyBuildArgs(&p.Build)
 
 	var buildErr error
-	fmt.Println("哟嚯%v\n", p.Bake.Files)
 	if len(p.Bake.Files) > 0 {
+		fmt.Printf("[info] Using bake mode, bake files: %s\n", strings.Join(p.Bake.Files, ","))
 		buildErr = p.doBake()
 	} else {
+		fmt.Printf("[info] Using dockerfile mode, dockerfile: %s\n", p.Build.Dockerfile)
 		buildErr = p.doBuild()
 	}
 	if buildErr != nil {

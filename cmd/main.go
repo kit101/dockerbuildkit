@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/dchest/uniuri"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/drone-plugins/drone-plugin-lib/drone"
 	"github.com/kit101/dockerbuildkit"
+	"github.com/kit101/dockerbuildkit/utils"
 )
 
 var (
@@ -479,13 +479,5 @@ func mirrors(c *cli.Context) []string {
 	if c.String("daemon.mirror") != "" {
 		m = append(m, c.String("daemon.mirror"))
 	}
-	return m
-}
-
-func GetExecCmd() string {
-	if runtime.GOOS == "windows" {
-		return "C:/bin/drone-docker.exe"
-	}
-
-	return "drone-docker"
+	return utils.SliceUnique(m)
 }
