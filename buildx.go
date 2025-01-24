@@ -159,8 +159,14 @@ func (b Bake) loadVariables() ([]string, error) {
 	return vars, nil
 }
 
-// loadTagsVariable 处理tags变量
+// loadTagsVariable 处理tags变量, variable > env > tags.auto/tags
 func (b Bake) loadTagsVariable(build Build, variables []string) []string {
+	for _, v := range b.Variables {
+		if strings.HasPrefix(v, b.TagsVariableName+"=") {
+			fmt.Printf("[info] tags from variable: %s\n", v)
+			return variables
+		}
+	}
 	if tags := os.Getenv(b.TagsVariableName); tags != "" {
 		fmt.Printf("[info] tags from env: %s\n", tags)
 		return variables
