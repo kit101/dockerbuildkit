@@ -75,6 +75,11 @@ func main() {
 			Usage:  "This flag is deprecated. Please use '--daemon.mirror'",
 			EnvVar: "PLUGIN_MIRROR,DOCKER_PLUGIN_MIRROR",
 		},
+		cli.StringSliceFlag{
+			Name:   "daemon.mirrors",
+			Usage:  "multiple docker daemon registry mirrors, separated by commas",
+			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
+		},
 		cli.StringFlag{
 			Name:   "daemon.mirrors",
 			Usage:  "docker daemon registry mirror",
@@ -176,6 +181,17 @@ func main() {
 			Name:   "args-from-env",
 			Usage:  "build args",
 			EnvVar: "PLUGIN_BUILD_ARGS_FROM_ENV",
+		},
+		cli.GenericFlag{
+			Name:   "args-new",
+			Usage:  "build args new",
+			EnvVar: "PLUGIN_BUILD_ARGS_NEW",
+			Value:  new(CustomStringSliceFlag),
+		},
+		cli.BoolFlag{
+			Name:   "plugin-multiple-build-agrs",
+			Usage:  "plugin multiple build agrs",
+			EnvVar: "PLUGIN_MULTIPLE_BUILD_ARGS",
 		},
 		cli.BoolFlag{
 			Name:   "quiet",
