@@ -10,8 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	docker "github.com/drone-plugins/drone-docker"
 	"github.com/drone-plugins/drone-plugin-lib/drone"
+	"github.com/kit101/dockerbuildkit"
 )
 
 var (
@@ -51,14 +51,38 @@ func main() {
 			Usage:  "git commit ref",
 			EnvVar: "DRONE_COMMIT_REF",
 		},
+
+		// buildx
+		cli.StringFlag{
+			Name:   "buildx.buildkitd-config",
+			Usage:  "buildx buildkitd-config. docker buildx create --buildkitd-config {}. (default: /etc/buildkitd/buildkitd.toml)",
+			EnvVar: "DRONE_BUILDX_BUILDKITD_CONFIG",
+		},
+		cli.StringFlag{
+			Name:   "buildx.driver-opt.image",
+			Usage:  "buildx driver-opt image. docker buildx create --driver-opt image={}",
+			EnvVar: "DRONE_BUILDX_DRIVER_OPT_IMAGE",
+		},
+		cli.StringFlag{
+			Name:   "buildx.params",
+			Usage:  "buildx params. docker buildx create {}",
+			EnvVar: "DRONE_BUILDX_PARAMS",
+		},
+
+		// daemon
 		cli.StringFlag{
 			Name:   "daemon.mirror",
-			Usage:  "docker daemon registry mirror. Multiple mirrors are separated by commas ','",
+			Usage:  "This flag is deprecated. Please use '--daemon.mirror'",
 			EnvVar: "PLUGIN_MIRROR,DOCKER_PLUGIN_MIRROR",
 		},
 		cli.StringSliceFlag{
 			Name:   "daemon.mirrors",
 			Usage:  "multiple docker daemon registry mirrors, separated by commas",
+			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
+		},
+		cli.StringFlag{
+			Name:   "daemon.mirrors",
+			Usage:  "docker daemon registry mirror",
 			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
 		},
 		cli.StringFlag{
@@ -117,6 +141,8 @@ func main() {
 			Usage:  "don't start the docker daemon",
 			EnvVar: "PLUGIN_DAEMON_OFF",
 		},
+
+		// build
 		cli.StringFlag{
 			Name:   "dockerfile",
 			Usage:  "build dockerfile",
@@ -222,6 +248,16 @@ func main() {
 			Usage:  "link https://example.com/org/repo-name",
 			EnvVar: "PLUGIN_REPO_LINK,DRONE_REPO_LINK",
 		},
+
+		// bake
+		cli.StringSliceFlag{Name: "bake.file", EnvVar: "PLUGIN_BAKE_FILE", Usage: "Build definition file"},
+		cli.StringFlag{Name: "bake.provenance", EnvVar: "PLUGIN_BAKE_PROVENANCE", Usage: "Shorthand for \"--set=*.attest=type=provenance\""},
+		cli.StringFlag{Name: "bake.sbom", EnvVar: "PLUGIN_BAKE_SBOM", Usage: "Shorthand for \"--set=*.attest=type=sbom\""},
+		cli.StringSliceFlag{Name: "bake.set", EnvVar: "PLUGIN_BAKE_SET", Usage: "Override target value (e.g., \"targetpattern.key=value\")"},
+		cli.StringFlag{Name: "bake.envfile", EnvVar: "PLUGIN_BAKE_ENVFILE", Usage: "will 'source ${bake.envfile}'"},
+		cli.StringSliceFlag{Name: "bake.variable", EnvVar: "PLUGIN_BAKE_VARIABLE", Usage: "load env"},
+
+		// docker
 		cli.StringFlag{
 			Name:   "docker.registry",
 			Usage:  "docker registry",
@@ -341,10 +377,10 @@ func run(c *cli.Context) error {
 		registryType = drone.RegistryType(c.String("registry-type"))
 	}
 
-	plugin := docker.Plugin{
+	plugin := dockerbuildkit.Plugin{
 		Dryrun:  c.Bool("dry-run"),
 		Cleanup: c.BoolT("docker.purge"),
-		Login: docker.Login{
+		Login: dockerbuildkit.Login{
 			Registry:    c.String("docker.registry"),
 			Username:    c.String("docker.username"),
 			Password:    c.String("docker.password"),
@@ -354,40 +390,50 @@ func run(c *cli.Context) error {
 		},
 		CardPath:     c.String("drone-card-path"),
 		ArtifactFile: c.String("artifact-file"),
-		Build: docker.Build{
-			Remote:              c.String("remote.url"),
-			Name:                c.String("commit.sha"),
-			TempTag:             generateTempTag(),
-			Dockerfile:          c.String("dockerfile"),
-			Context:             c.String("context"),
-			Tags:                c.StringSlice("tags"),
-			Args:                c.StringSlice("args"),
-			ArgsEnv:             c.StringSlice("args-from-env"),
-			ArgsNew:             c.Generic("args-new").(*CustomStringSliceFlag).GetValue(),
-			IsMultipleBuildArgs: c.Bool("plugin-multiple-build-agrs"),
-			Target:              c.String("target"),
-			Squash:              c.Bool("squash"),
-			Pull:                c.BoolT("pull-image"),
-			CacheFrom:           c.StringSlice("cache-from"),
-			Compress:            c.Bool("compress"),
-			Repo:                c.String("repo"),
-			Labels:              c.StringSlice("custom-labels"),
-			LabelSchema:         c.StringSlice("label-schema"),
-			AutoLabel:           c.BoolT("auto-label"),
-			Link:                c.String("link"),
-			NoCache:             c.Bool("no-cache"),
-			Secret:              c.String("secret"),
-			SecretEnvs:          c.StringSlice("secrets-from-env"),
-			SecretFiles:         c.StringSlice("secrets-from-file"),
-			AddHost:             c.StringSlice("add-host"),
-			Quiet:               c.Bool("quiet"),
-			Platform:            c.String("platform"),
-			SSHAgentKey:         c.String("ssh-agent-key"),
+		Build: dockerbuildkit.Build{
+			Remote:      c.String("remote.url"),
+			Name:        c.String("commit.sha"),
+			TempTag:     generateTempTag(),
+			Dockerfile:  c.String("dockerfile"),
+			Context:     c.String("context"),
+			Tags:        c.StringSlice("tags"),
+			Args:        c.StringSlice("args"),
+			ArgsEnv:     c.StringSlice("args-from-env"),
+			Target:      c.String("target"),
+			Squash:      c.Bool("squash"),
+			Pull:        c.BoolT("pull-image"),
+			CacheFrom:   c.StringSlice("cache-from"),
+			Compress:    c.Bool("compress"),
+			Repo:        c.String("repo"),
+			Labels:      c.StringSlice("custom-labels"),
+			LabelSchema: c.StringSlice("label-schema"),
+			AutoLabel:   c.BoolT("auto-label"),
+			Link:        c.String("link"),
+			NoCache:     c.Bool("no-cache"),
+			Secret:      c.String("secret"),
+			SecretEnvs:  c.StringSlice("secrets-from-env"),
+			SecretFiles: c.StringSlice("secrets-from-file"),
+			AddHost:     c.StringSlice("add-host"),
+			Quiet:       c.Bool("quiet"),
+			Platform:    c.String("platform"),
+			SSHAgentKey: c.String("ssh-agent-key"),
 		},
-		Daemon: docker.Daemon{
+		Bake: dockerbuildkit.Bake{
+			Files:      c.StringSlice("bake.file"),
+			Provenance: c.String("bake.provenance"),
+			Sbom:       c.String("bake.sbom"),
+			Sets:       c.StringSlice("bake.set"),
+			Variables:  c.StringSlice("bake.variable"),
+			Envfile:    c.String("bake.envfile"),
+		},
+		Buildx: dockerbuildkit.Buildx{
+			BuildkitdConfig: c.String("buildx.buildkitd-config"),
+			DriverOptImage:  c.String("buildx.driver-opt.image"),
+			Params:          c.String("buildx.params"),
+		},
+		Daemon: dockerbuildkit.Daemon{
 			Registry:      c.String("docker.registry"),
-			Mirror:        c.String("daemon.mirror"),
-			Mirrors:       c.StringSlice("daemon.mirrors"),
+			Mirrors:       mirrors(c),
 			StorageDriver: c.String("daemon.storage-driver"),
 			StoragePath:   c.String("daemon.storage-path"),
 			Insecure:      c.Bool("daemon.insecure"),
@@ -407,11 +453,11 @@ func run(c *cli.Context) error {
 	}
 
 	if c.Bool("tags.auto") {
-		if docker.UseDefaultTag( // return true if tag event or default branch
+		if dockerbuildkit.UseDefaultTag( // return true if tag event or default branch
 			c.String("commit.ref"),
 			c.String("repo.branch"),
 		) {
-			tag, err := docker.DefaultTagSuffix(
+			tag, err := dockerbuildkit.DefaultTagSuffix(
 				c.String("commit.ref"),
 				c.String("tags.suffix"),
 			)
@@ -431,6 +477,14 @@ func run(c *cli.Context) error {
 
 func generateTempTag() string {
 	return strings.ToLower(uniuri.New())
+}
+
+func mirrors(c *cli.Context) []string {
+	m := c.StringSlice("daemon.mirrors")
+	if c.String("daemon.mirror") != "" {
+		m = append(m, c.String("daemon.mirror"))
+	}
+	return m
 }
 
 func GetExecCmd() string {

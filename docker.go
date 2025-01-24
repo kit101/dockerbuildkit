@@ -1,24 +1,23 @@
-package docker
+package dockerbuildkit
 
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
-	"github.com/drone-plugins/drone-docker/internal/docker"
 	"github.com/drone-plugins/drone-plugin-lib/drone"
+	"github.com/kit101/dockerbuildkit/internal/docker"
 )
 
 type (
 	// Daemon defines Docker daemon parameters.
 	Daemon struct {
 		Registry      string             // Docker registry
-		Mirror        string             // Docker registry mirror
 		Mirrors       []string           // Docker registry mirrors
 		Insecure      bool               // Docker daemon enable insecure registries
 		StorageDriver string             // Docker daemon storage driver
@@ -34,6 +33,13 @@ type (
 		RegistryType  drone.RegistryType // Docker registry type
 	}
 
+	// Buildx defines Buildx parameters
+	Buildx struct {
+		BuildkitdConfig string // Buildx instance buildkitd-config
+		DriverOptImage  string // Buildx instance driver-opt image
+		Params          string // Buildx instance other params
+	}
+
 	// Login defines Docker login parameters.
 	Login struct {
 		Registry    string // Docker registry address
@@ -44,7 +50,7 @@ type (
 		AccessToken string // External Access Token
 	}
 
-	// Build defines Docker build parameters.
+	// Build defines Docker buildx build parameters.
 	Build struct {
 		Remote              string   // Git remote URL
 		Name                string   // Docker build using default named tag
@@ -77,11 +83,23 @@ type (
 		SSHKeyPath          string   // Docker build ssh key path
 	}
 
+	// Bake defines Docker buildx bake parameters.
+	Bake struct {
+		Files      []string // bake file
+		Provenance string   // bake provenance
+		Sbom       string   // bake sbom
+		Sets       []string //  bake set
+		Variables  []string // variable
+		Envfile    string   // environment file
+	}
+
 	// Plugin defines the Docker plugin parameters.
 	Plugin struct {
 		Login             Login  // Docker login configuration
-		Build             Build  // Docker build configuration
 		Daemon            Daemon // Docker daemon configuration
+		Buildx            Buildx // Buildx configuration
+		Build             Build  // Docker build configuration
+		Bake              Bake   // Docker buildx bake configuration
 		Dryrun            bool   // Docker push is skipped
 		Cleanup           bool   // Docker purge is enabled
 		CardPath          string // Card path to write file to
@@ -121,6 +139,12 @@ type (
 
 // Exec executes the plugin step
 func (p Plugin) Exec() error {
+	// handle buildkitd home
+	if os.Getenv(BuildkitdHomeEnvName) == "" {
+		wd, _ := os.Getwd()
+		os.Setenv(BuildkitdHomeEnvName, wd)
+	}
+
 	// start the Docker daemon server
 	if !p.Daemon.Disabled {
 		p.startDaemon()
@@ -141,6 +165,12 @@ func (p Plugin) Exec() error {
 		time.Sleep(time.Second * 1)
 	}
 
+	// create buildx instance
+	err := p.createBuildxInstance()
+	if err != nil {
+		return err
+	}
+
 	// for debugging purposes, log the type of authentication
 	// credentials that have been provided.
 	switch {
@@ -156,7 +186,7 @@ func (p Plugin) Exec() error {
 		fmt.Println("Registry credentials or Docker config not provided. Guest mode enabled.")
 	}
 
-	// create Auth Config File
+	// create Auth Config Files
 	if p.Login.Config != "" {
 		os.MkdirAll(dockerHome, 0600)
 
@@ -227,50 +257,15 @@ func (p Plugin) Exec() error {
 	// add proxy build args
 	addProxyBuildArgs(&p.Build)
 
-	var cmds []*exec.Cmd
-	cmds = append(cmds, commandVersion()) // docker version
-	cmds = append(cmds, commandInfo())    // docker info
-
-	// pre-pull cache images
-	for _, img := range p.Build.CacheFrom {
-		cmds = append(cmds, commandPull(img))
+	var buildErr error
+	fmt.Println("哟嚯%v\n", p.Bake.Files)
+	if len(p.Bake.Files) > 0 {
+		buildErr = p.doBake()
+	} else {
+		buildErr = p.doBuild()
 	}
-
-	// setup for using ssh agent (https://docs.docker.com/develop/develop-images/build_enhancements/#using-ssh-to-access-private-data-in-builds)
-	if p.Build.SSHAgentKey != "" {
-		var sshErr error
-		p.Build.SSHKeyPath, sshErr = writeSSHPrivateKey(p.Build.SSHAgentKey)
-		if sshErr != nil {
-			return sshErr
-		}
-	}
-
-	cmds = append(cmds, commandBuild(p.Build)) // docker build
-
-	for _, tag := range p.Build.Tags {
-		cmds = append(cmds, commandTag(p.Build, tag)) // docker tag
-
-		if !p.Dryrun {
-			cmds = append(cmds, commandPush(p.Build, tag)) // docker push
-		}
-	}
-
-	// execute all commands in batch mode.
-	for _, cmd := range cmds {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		trace(cmd)
-
-		err := cmd.Run()
-		if err != nil && isCommandPull(cmd.Args) {
-			fmt.Printf("Could not pull cache-from image %s. Ignoring...\n", cmd.Args[2])
-		} else if err != nil && isCommandPrune(cmd.Args) {
-			fmt.Printf("Could not prune system containers. Ignoring...\n")
-		} else if err != nil && isCommandRmi(cmd.Args) {
-			fmt.Printf("Could not remove image %s. Ignoring...\n", cmd.Args[2])
-		} else if err != nil {
-			return err
-		}
+	if buildErr != nil {
+		return buildErr
 	}
 
 	// output the adaptive card
@@ -291,18 +286,64 @@ func (p Plugin) Exec() error {
 	// execute cleanup routines in batch mode
 	if p.Cleanup {
 		// clear the slice
-		cmds = nil
+		var cmds []*exec.Cmd
 
 		cmds = append(cmds, commandRmi(p.Build.TempTag)) // docker rmi
 		cmds = append(cmds, commandPrune())              // docker system prune -f
 
 		for _, cmd := range cmds {
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			trace(cmd)
+			_ = traceRun(cmd, os.Stdout)
 		}
 	}
 
+	return nil
+}
+
+func (p Plugin) preBuild() []*exec.Cmd {
+	var cmds []*exec.Cmd
+	cmds = append(cmds, commandVersion())               // docker version
+	cmds = append(cmds, commandInfo())                  // docker info
+	cmds = append(cmds, commandInspectBuildxInstance()) // buildx instance inspect
+	return cmds
+}
+
+func (p Plugin) doBuild() error {
+	cmds := p.preBuild()
+
+	// pre-pull cache images
+	for _, img := range p.Build.CacheFrom {
+		cmds = append(cmds, commandPull(img))
+	}
+
+	// setup for using ssh agent (https://docs.docker.com/develop/develop-images/build_enhancements/#using-ssh-to-access-private-data-in-builds)
+	if p.Build.SSHAgentKey != "" {
+		var sshErr error
+		p.Build.SSHKeyPath, sshErr = writeSSHPrivateKey(p.Build.SSHAgentKey)
+		if sshErr != nil {
+			return sshErr
+		}
+	}
+
+	cache := fmt.Sprintf(buildkitdCachePath(), p.Build.TempTag)
+	cmds = append(cmds, commandBuild(p.Build, p.Build.TempTag, cache, "", true)) // docker build
+	for _, tag := range p.Build.Tags {
+		imageName := fmt.Sprintf("%s:%s", p.Build.Repo, tag)
+		cmds = append(cmds, commandBuild(p.Build, imageName, "", cache, p.Dryrun)) // docker tag
+	}
+
+	// execute all commands in batch mode.
+	for _, cmd := range cmds {
+		err := traceRun(cmd, os.Stdout)
+		if err != nil && isCommandPull(cmd.Args) {
+			fmt.Printf("Could not pull cache-from image %s. Ignoring...\n", cmd.Args[2])
+		} else if err != nil && isCommandPrune(cmd.Args) {
+			fmt.Printf("Could not prune system containers. Ignoring...\n")
+		} else if err != nil && isCommandRmi(cmd.Args) {
+			fmt.Printf("Could not remove image %s. Ignoring...\n", cmd.Args[2])
+		} else if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -388,13 +429,14 @@ func commandInfo() *exec.Cmd {
 	return exec.Command(dockerExe, "info")
 }
 
-// helper function to create the docker build command.
-func commandBuild(build Build) *exec.Cmd {
+// helper function to create the buildx build command.
+func commandBuild(build Build, tag, cacheto, cachefrom string, dryRun bool) *exec.Cmd {
 	args := []string{
+		"buildx",
 		"build",
 		"--rm=true",
 		"-f", build.Dockerfile,
-		"-t", build.TempTag,
+		"-t", tag,
 	}
 
 	args = append(args, build.Context)
@@ -453,6 +495,12 @@ func commandBuild(build Build) *exec.Cmd {
 	if build.SSHKeyPath != "" {
 		args = append(args, "--ssh", build.SSHKeyPath)
 	}
+	if cachefrom != "" {
+		args = append(args, "--cache-from", fmt.Sprintf("type=local,src=%s", cachefrom))
+	}
+	if cacheto != "" {
+		args = append(args, "--cache-to", fmt.Sprintf("type=local,dest=%s", cacheto))
+	}
 
 	if build.AutoLabel {
 		labelSchema := []string{
@@ -481,6 +529,10 @@ func commandBuild(build Build) *exec.Cmd {
 	// we need to enable buildkit, for secret support and ssh agent support
 	if build.Secret != "" || len(build.SecretEnvs) > 0 || len(build.SecretFiles) > 0 || build.SSHAgentKey != "" {
 		os.Setenv("DOCKER_BUILDKIT", "1")
+	}
+
+	if !dryRun {
+		args = append(args, "--push")
 	}
 	return exec.Command(dockerExe, args...)
 }
@@ -571,70 +623,6 @@ func hasProxyBuildArgNew(build *Build, key string) bool {
 	return false
 }
 
-// helper function to create the docker tag command.
-func commandTag(build Build, tag string) *exec.Cmd {
-	var (
-		source = build.TempTag
-		target = fmt.Sprintf("%s:%s", build.Repo, tag)
-	)
-	return exec.Command(
-		dockerExe, "tag", source, target,
-	)
-}
-
-// helper function to create the docker push command.
-func commandPush(build Build, tag string) *exec.Cmd {
-	target := fmt.Sprintf("%s:%s", build.Repo, tag)
-	return exec.Command(dockerExe, "push", target)
-}
-
-// helper function to create the docker daemon command.
-func commandDaemon(daemon Daemon) *exec.Cmd {
-	args := []string{
-		"--data-root", daemon.StoragePath,
-		"--host=unix:///var/run/docker.sock",
-	}
-
-	if _, err := os.Stat("/etc/docker/default.json"); err == nil {
-		args = append(args, "--seccomp-profile=/etc/docker/default.json")
-	}
-
-	if daemon.StorageDriver != "" {
-		args = append(args, "-s", daemon.StorageDriver)
-	}
-	if daemon.Insecure && daemon.Registry != "" {
-		args = append(args, "--insecure-registry", daemon.Registry)
-	}
-	if daemon.IPv6 {
-		args = append(args, "--ipv6")
-	}
-	if len(daemon.Mirror) != 0 {
-		fmt.Fprintf(os.Stdout, "!!! warning: `daemon.mirror` is deprecated and should be replaced with `daemon.mirrors`\n")
-		daemon.Mirrors = append(daemon.Mirrors, daemon.Mirror)
-	}
-	if len(daemon.Mirrors) != 0 {
-		for _, mirror := range daemon.Mirrors {
-			args = append(args, "--registry-mirror", mirror)
-		}
-	}
-	if len(daemon.Bip) != 0 {
-		args = append(args, "--bip", daemon.Bip)
-	}
-	for _, dns := range daemon.DNS {
-		args = append(args, "--dns", dns)
-	}
-	for _, dnsSearch := range daemon.DNSSearch {
-		args = append(args, "--dns-search", dnsSearch)
-	}
-	if len(daemon.MTU) != 0 {
-		args = append(args, "--mtu", daemon.MTU)
-	}
-	if daemon.Experimental {
-		args = append(args, "--experimental")
-	}
-	return exec.Command(dockerdExe, args...)
-}
-
 // helper to check if args match "docker prune"
 func isCommandPrune(args []string) bool {
 	return len(args) > 3 && args[2] == "prune"
@@ -676,12 +664,12 @@ func trace(cmd *exec.Cmd) {
 	fmt.Fprintf(os.Stdout, "+ %s\n", strings.Join(cmd.Args, " "))
 }
 
-func GetDroneDockerExecCmd() string {
-	if runtime.GOOS == "windows" {
-		return "C:/bin/drone-docker.exe"
-	}
-
-	return "drone-docker"
+// traceRun stdout: os.Stdout (in console) or io.Discard (quiet)
+func traceRun(cmd *exec.Cmd, stdout io.Writer) error {
+	cmd.Stdout = stdout
+	cmd.Stderr = os.Stderr
+	trace(cmd)
+	return cmd.Run()
 }
 
 func getDigest(buildName string) (string, error) {

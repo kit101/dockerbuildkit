@@ -1,4 +1,4 @@
-package docker
+package dockerbuildkit
 
 import (
 	"os/exec"
@@ -16,7 +16,7 @@ func TestCommandStartDaemon(t *testing.T) {
 			name: "multi mirrors",
 			daemon: Daemon{
 				StoragePath: "/var/lib/docker",
-				Mirror:      "https://a.com,https://b.com,https://c.com",
+				Mirrors:     []string{"https://a.com", "https://b.com", "https://c.com"},
 			},
 			want: exec.Command(
 				dockerdExe,
@@ -35,7 +35,7 @@ func TestCommandStartDaemon(t *testing.T) {
 			name: "single mirrors",
 			daemon: Daemon{
 				StoragePath: "/var/lib/docker",
-				Mirror:      "https://a.com",
+				Mirrors:     []string{"https://a.com"},
 			},
 			want: exec.Command(
 				dockerdExe,

@@ -4,3 +4,4 @@ coverage.out
 vendor
 .vscode/
 Dockerfile
+.idea
