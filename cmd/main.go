@@ -81,11 +81,6 @@ func main() {
 			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
 		},
 		cli.StringFlag{
-			Name:   "daemon.mirrors",
-			Usage:  "docker daemon registry mirror",
-			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
-		},
-		cli.StringFlag{
 			Name:   "daemon.storage-driver",
 			Usage:  "docker daemon storage driver",
 			EnvVar: "PLUGIN_STORAGE_DRIVER",
