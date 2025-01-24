@@ -10,8 +10,8 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/drone-plugins/drone-plugin-lib/drone"
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/kit101/dockerbuildkit"
-	"github.com/kit101/dockerbuildkit/utils"
 )
 
 var (
@@ -246,11 +246,13 @@ func main() {
 
 		// bake
 		cli.StringSliceFlag{Name: "bake.file", EnvVar: "PLUGIN_BAKE_FILE", Usage: "Build definition file"},
+		cli.StringSliceFlag{Name: "bake.target", EnvVar: "PLUGIN_BAKE_TARGET", Usage: "A target in a Bake file represents a build invocation"},
 		cli.StringFlag{Name: "bake.provenance", EnvVar: "PLUGIN_BAKE_PROVENANCE", Usage: "Shorthand for \"--set=*.attest=type=provenance\""},
 		cli.StringFlag{Name: "bake.sbom", EnvVar: "PLUGIN_BAKE_SBOM", Usage: "Shorthand for \"--set=*.attest=type=sbom\""},
 		cli.StringSliceFlag{Name: "bake.set", EnvVar: "PLUGIN_BAKE_SET", Usage: "Override target value (e.g., \"targetpattern.key=value\")"},
 		cli.StringFlag{Name: "bake.envfile", EnvVar: "PLUGIN_BAKE_ENVFILE", Usage: "will 'source ${bake.envfile}'"},
 		cli.StringSliceFlag{Name: "bake.variable", EnvVar: "PLUGIN_BAKE_VARIABLE", Usage: "load env"},
+		cli.StringFlag{Name: "bake.tags-variable-name", EnvVar: "PLUGIN_BAKE_TAGS_NAME", Usage: "Tags variable name generated after using tags or tags.auto. Default \"TAGS\"", Value: dockerbuildkit.DefaultTagsVariableName},
 
 		// docker
 		cli.StringFlag{
@@ -414,12 +416,14 @@ func run(c *cli.Context) error {
 			SSHAgentKey: c.String("ssh-agent-key"),
 		},
 		Bake: dockerbuildkit.Bake{
-			Files:      c.StringSlice("bake.file"),
-			Provenance: c.String("bake.provenance"),
-			Sbom:       c.String("bake.sbom"),
-			Sets:       c.StringSlice("bake.set"),
-			Variables:  c.StringSlice("bake.variable"),
-			Envfile:    c.String("bake.envfile"),
+			Files:            c.StringSlice("bake.file"),
+			Targets:          c.StringSlice("bake.target"),
+			Provenance:       c.String("bake.provenance"),
+			Sbom:             c.String("bake.sbom"),
+			Sets:             c.StringSlice("bake.set"),
+			Variables:        c.StringSlice("bake.variable"),
+			Envfile:          c.String("bake.envfile"),
+			TagsVariableName: c.String("bake.tags-variable-name"),
 		},
 		Buildx: dockerbuildkit.Buildx{
 			BuildkitdConfig: c.String("buildx.buildkitd-config"),
@@ -467,7 +471,8 @@ func run(c *cli.Context) error {
 		}
 	}
 
-	return plugin.Exec()
+	err := plugin.Exec()
+	return err
 }
 
 func generateTempTag() string {
@@ -479,5 +484,5 @@ func mirrors(c *cli.Context) []string {
 	if c.String("daemon.mirror") != "" {
 		m = append(m, c.String("daemon.mirror"))
 	}
-	return utils.SliceUnique(m)
+	return slice.Unique(m)
 }

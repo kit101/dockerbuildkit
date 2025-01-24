@@ -85,12 +85,14 @@ type (
 
 	// Bake defines Docker buildx bake parameters.
 	Bake struct {
-		Files      []string // bake file
-		Provenance string   // bake provenance
-		Sbom       string   // bake sbom
-		Sets       []string //  bake set
-		Variables  []string // variable
-		Envfile    string   // environment file
+		Files            []string // bake file
+		Targets          []string // bake target
+		Provenance       string   // bake provenance
+		Sbom             string   // bake sbom
+		Sets             []string // bake set
+		Variables        []string // variable
+		Envfile          string   // environment file
+		TagsVariableName string   // tags variable name
 	}
 
 	// Plugin defines the Docker plugin parameters.
@@ -295,6 +297,8 @@ func (p Plugin) Exec() error {
 		for _, cmd := range cmds {
 			_ = traceRun(cmd, os.Stdout)
 		}
+
+		p.destroyBuildxInstance()
 	}
 
 	return nil

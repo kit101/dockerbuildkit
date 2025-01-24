@@ -3,16 +3,20 @@ package dockerbuildkit
 import (
 	"errors"
 	"fmt"
-	"github.com/BurntSushi/toml"
-	"github.com/dchest/uniuri"
-	"github.com/joho/godotenv"
-	resolverconfig "github.com/moby/buildkit/util/resolver/config"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/BurntSushi/toml"
+	"github.com/dchest/uniuri"
+	"github.com/duke-git/lancet/v2/fileutil"
+	"github.com/joho/godotenv"
+	resolverconfig "github.com/moby/buildkit/util/resolver/config"
 )
+
+const DefaultTagsVariableName = "TAGS"
 
 func (p Plugin) createBuildxInstance() error {
 	if p.Buildx.BuildkitdConfig == "" && len(p.Daemon.Mirrors) > 0 {
@@ -31,6 +35,12 @@ func (p Plugin) createBuildxInstance() error {
 		return fmt.Errorf("can't create buildx builder instance: %v", err)
 	}
 	return err
+}
+
+func (p Plugin) destroyBuildxInstance() {
+	_ = traceRun(exec.Command(dockerExe, "buildx", "du"), os.Stdout)
+	_ = traceRun(exec.Command(dockerExe, "buildx", "prune", "-f", "-a"), os.Stdout)
+	_ = traceRun(exec.Command(dockerExe, "buildx", "rm"), os.Stdout)
 }
 
 func (p Plugin) commandCreateBuildxInstance() *exec.Cmd {
@@ -112,9 +122,10 @@ func (p Plugin) doBake() error {
 	if err != nil {
 		return err
 	}
+	variables = p.Bake.loadTagsVariable(p.Build, variables)
 
 	cmds = append(cmds, p.Bake.commandBakePrint(variables))
-	cmds = append(cmds, p.Bake.commandBakePush(variables, metadataFilePath))
+	cmds = append(cmds, p.Bake.commandBakePush(variables, metadataFilePath, p.Dryrun))
 
 	for _, cmd := range cmds {
 		err := traceRun(cmd, os.Stdout)
@@ -122,6 +133,7 @@ func (p Plugin) doBake() error {
 			return err
 		}
 	}
+	p.Bake.printMetadataFile(metadataFilePath)
 	return nil
 }
 
@@ -147,6 +159,17 @@ func (b Bake) loadVariables() ([]string, error) {
 	return vars, nil
 }
 
+// loadTagsVariable 处理tags变量
+func (b Bake) loadTagsVariable(build Build, variables []string) []string {
+	if tags := os.Getenv(b.TagsVariableName); tags != "" {
+		fmt.Printf("[info] tags from env: %s\n", tags)
+		return variables
+	}
+	tags := fmt.Sprintf("%s=%s", b.TagsVariableName, strings.Join(build.Tags, ","))
+	fmt.Printf("[info] tags from build.Tags: %s\n", tags)
+	return append(variables, tags)
+}
+
 func (b Bake) commandBakePrint(variables []string) *exec.Cmd {
 	args := []string{"buildx", "bake", "--print"}
 	args = b.handleBakeParameters(args)
@@ -155,8 +178,11 @@ func (b Bake) commandBakePrint(variables []string) *exec.Cmd {
 	return cmd
 }
 
-func (b Bake) commandBakePush(variables []string, metadataFilePath string) *exec.Cmd {
-	args := []string{"buildx", "bake", "--push"}
+func (b Bake) commandBakePush(variables []string, metadataFilePath string, dryRun bool) *exec.Cmd {
+	args := []string{"buildx", "bake"}
+	if !dryRun {
+		args = append(args, "--push")
+	}
 	args = b.handleBakeParameters(args)
 	args = append(args, "--metadata-file", metadataFilePath)
 	cmd := exec.Command(dockerExe, args...)
@@ -177,5 +203,21 @@ func (b Bake) handleBakeParameters(args []string) []string {
 	if b.Sbom != "" {
 		args = append(args, "--sbom", b.Sbom)
 	}
+	for _, t := range b.Targets {
+		args = append(args, t)
+	}
 	return args
+}
+
+func (b Bake) printMetadataFile(metadataFilePath string) {
+	if !fileutil.IsExist(metadataFilePath) {
+		fmt.Printf("[warning] file `%s` is not exists", metadataFilePath)
+		return
+	}
+	metadata, err := fileutil.ReadFileToString(metadataFilePath)
+	if err != nil {
+		fmt.Printf("[warning] read file `%s` to string error, %v", metadataFilePath, err)
+		return
+	}
+	fmt.Printf("[info] metadata.json:\n%s\n", metadata)
 }
