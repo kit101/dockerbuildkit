@@ -72,7 +72,7 @@ func main() {
 		// daemon
 		cli.StringFlag{
 			Name:   "daemon.mirror",
-			Usage:  "This flag is deprecated. Please use '--daemon.mirror'",
+			Usage:  "This flag is deprecated. Please use '--daemon.mirrors'",
 			EnvVar: "PLUGIN_MIRROR,DOCKER_PLUGIN_MIRROR",
 		},
 		cli.StringSliceFlag{
