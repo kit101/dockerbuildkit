@@ -28,12 +28,7 @@ export GOARCH=amd64
 export CGO_ENABLED=0
 export GO111MODULE=on
 
-go build -v -a -tags netgo -o release/linux/amd64/drone-docker ./cmd/drone-docker
-go build -v -a -tags netgo -o release/linux/amd64/drone-gcr ./cmd/drone-gcr
-go build -v -a -tags netgo -o release/linux/amd64/drone-ecr ./cmd/drone-ecr
-go build -v -a -tags netgo -o release/linux/amd64/drone-acr ./cmd/drone-acr
-go build -v -a -tags netgo -o release/linux/amd64/drone-heroku ./cmd/drone-heroku
-go build -v -a -tags netgo -o release/linux/amd64/drone-gar ./cmd/drone-gar
+go build -v -a -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
 ```
 
 ## Docker
@@ -44,37 +39,103 @@ Build the Docker images with the following commands:
 docker build \
   --label org.label-schema.build-date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
   --label org.label-schema.vcs-ref=$(git rev-parse --short HEAD) \
-  --file docker/docker/Dockerfile.linux.amd64 --tag plugins/docker .
+  --file docker/Dockerfile --tag kit101z/dockerbuildkit .
 
-docker build \
-  --label org.label-schema.build-date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-  --label org.label-schema.vcs-ref=$(git rev-parse --short HEAD) \
-  --file docker/gcr/Dockerfile.linux.amd64 --tag plugins/gcr .
-
-docker build \
-  --label org.label-schema.build-date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-  --label org.label-schema.vcs-ref=$(git rev-parse --short HEAD) \
-  --file docker/ecr/Dockerfile.linux.amd64 --tag plugins/ecr .
-
-docker build \
-  --label org.label-schema.build-date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-  --label org.label-schema.vcs-ref=$(git rev-parse --short HEAD) \
-  --file docker/acr/Dockerfile.linux.amd64 --tag plugins/acr .
-
-docker build \
-  --label org.label-schema.build-date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-  --label org.label-schema.vcs-ref=$(git rev-parse --short HEAD) \
-  --file docker/heroku/Dockerfile.linux.amd64 --tag plugins/heroku .
-  
-docker build \
-  --label org.label-schema.build-date=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-  --label org.label-schema.vcs-ref=$(git rev-parse --short HEAD) \
-  --file docker/gar/Dockerfile.linux.amd64 --tag plugins/gar .
 ```
 
 ## Usage
 
 > Notice: Be aware that the Docker plugin currently requires privileged capabilities, otherwise the integrated Docker daemon is not able to start.
+
+### Help info
+
+```console
+/src # dockerbuildkit --help
+NAME:
+   docker plugin - docker plugin
+
+USAGE:
+   dockerbuildkit [global options] command [command options] [arguments...]
+
+VERSION:
+   d090da7975ecb0cd925aa4778b08d5e47d0c9e89
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --dry-run                         dry run disables docker push [$PLUGIN_DRY_RUN]
+   --remote.url value                git remote url [$DRONE_REMOTE_URL]
+   --commit.sha value                git commit sha (default: "00000000") [$DRONE_COMMIT_SHA]
+   --commit.ref value                git commit ref [$DRONE_COMMIT_REF]
+   --buildx.buildkitd-config value   buildx buildkitd-config. docker buildx create --buildkitd-config {}. (default: /etc/buildkitd/buildkitd.toml) [$DRONE_BUILDX_BUILDKITD_CONFIG]
+   --buildx.driver-opt.image value   buildx driver-opt image. docker buildx create --driver-opt image={} [$DRONE_BUILDX_DRIVER_OPT_IMAGE]
+   --buildx.params value             buildx params. docker buildx create {} [$DRONE_BUILDX_PARAMS]
+   --daemon.mirror value             This flag is deprecated. Please use '--daemon.mirror' [$PLUGIN_MIRROR, $DOCKER_PLUGIN_MIRROR]
+   --daemon.mirrors value            multiple docker daemon registry mirrors, separated by commas [$PLUGIN_MIRRORS, $DOCKER_PLUGIN_MIRRORS]
+   --daemon.storage-driver value     docker daemon storage driver [$PLUGIN_STORAGE_DRIVER]
+   --daemon.storage-path value       docker daemon storage path (default: "/var/lib/docker") [$PLUGIN_STORAGE_PATH]
+   --daemon.bip value                docker daemon bride ip address [$PLUGIN_BIP]
+   --daemon.mtu value                docker daemon custom mtu setting [$PLUGIN_MTU]
+   --daemon.dns value                docker daemon dns server [$PLUGIN_CUSTOM_DNS]
+   --daemon.dns-search value         docker daemon dns search domains [$PLUGIN_CUSTOM_DNS_SEARCH]
+   --daemon.insecure                 docker daemon allows insecure registries [$PLUGIN_INSECURE]
+   --daemon.ipv6                     docker daemon IPv6 networking [$PLUGIN_IPV6]
+   --daemon.experimental             docker daemon Experimental mode [$PLUGIN_EXPERIMENTAL]
+   --daemon.debug                    docker daemon executes in debug mode [$PLUGIN_DEBUG, $DOCKER_LAUNCH_DEBUG]
+   --daemon.off                      don't start the docker daemon [$PLUGIN_DAEMON_OFF]
+   --dockerfile value                build dockerfile (default: "Dockerfile") [$PLUGIN_DOCKERFILE]
+   --context value                   build context (default: ".") [$PLUGIN_CONTEXT]
+   --tags value                      build tags (default: "latest") [$PLUGIN_TAG, $PLUGIN_TAGS] [.tags]
+   --tags.auto                       default build tags [$PLUGIN_DEFAULT_TAGS, $PLUGIN_AUTO_TAG]
+   --tags.suffix value               default build tags with suffix [$PLUGIN_DEFAULT_SUFFIX, $PLUGIN_AUTO_TAG_SUFFIX]
+   --args value                      build args [$PLUGIN_BUILD_ARGS]
+   --args-from-env value             build args [$PLUGIN_BUILD_ARGS_FROM_ENV]
+   --args-new value                  build args new [$PLUGIN_BUILD_ARGS_NEW]
+   --plugin-multiple-build-agrs      plugin multiple build agrs [$PLUGIN_MULTIPLE_BUILD_ARGS]
+   --quiet                           quiet docker build [$PLUGIN_QUIET]
+   --target value                    build target [$PLUGIN_TARGET]
+   --cache-from value                images to consider as cache sources [$PLUGIN_CACHE_FROM]
+   --squash                          squash the layers at build time [$PLUGIN_SQUASH]
+   --pull-image                      force pull base image at build time [$PLUGIN_PULL_IMAGE]
+   --compress                        compress the build context using gzip [$PLUGIN_COMPRESS]
+   --repo value                      docker repository [$PLUGIN_REPO]
+   --custom-labels value             additional k=v labels [$PLUGIN_CUSTOM_LABELS]
+   --label-schema value              label-schema labels [$PLUGIN_LABEL_SCHEMA]
+   --auto-label                      auto-label true|false [$PLUGIN_AUTO_LABEL]
+   --link value                      link https://example.com/org/repo-name [$PLUGIN_REPO_LINK, $DRONE_REPO_LINK]
+   --bake.file value                 Build definition file [$PLUGIN_BAKE_FILE]
+   --bake.target value               A target in a Bake file represents a build invocation [$PLUGIN_BAKE_TARGET]
+   --bake.provenance value           Shorthand for "--set=*.attest=type=provenance" [$PLUGIN_BAKE_PROVENANCE]
+   --bake.sbom value                 Shorthand for "--set=*.attest=type=sbom" [$PLUGIN_BAKE_SBOM]
+   --bake.set value                  Override target value (e.g., "targetpattern.key=value") [$PLUGIN_BAKE_SET]
+   --bake.envfile value              will 'source ${bake.envfile}' [$PLUGIN_BAKE_ENVFILE]
+   --bake.variable value             load env [$PLUGIN_BAKE_VARIABLE]
+   --bake.tags-variable-name value   Tags variable name generated after using tags or tags.auto. Default "TAGS" (default: "TAGS") [$PLUGIN_BAKE_TAGS_NAME]
+   --docker.registry value           docker registry (default: "https://index.docker.io/v1/") [$PLUGIN_REGISTRY, $DOCKER_REGISTRY]
+   --docker.username value           docker username [$PLUGIN_USERNAME, $DOCKER_USERNAME]
+   --docker.password value           docker password [$PLUGIN_PASSWORD, $DOCKER_PASSWORD]
+   --docker.baseimageusername value  Docker username for base image registry [$PLUGIN_DOCKER_USERNAME, $PLUGIN_BASE_IMAGE_USERNAME, $DOCKER_BASE_IMAGE_USERNAME]
+   --docker.baseimagepassword value  Docker password for base image registry [$PLUGIN_DOCKER_PASSWORD, $PLUGIN_BASE_IMAGE_PASSWORD, $DOCKER_BASE_IMAGE_PASSWORD]
+   --docker.baseimageregistry value  Docker registry for base image registry [$PLUGIN_DOCKER_REGISTRY, $PLUGIN_BASE_IMAGE_REGISTRY, $DOCKER_BASE_IMAGE_REGISTRY]
+   --docker.email value              docker email [$PLUGIN_EMAIL, $DOCKER_EMAIL]
+   --docker.config value             docker json dockerconfig content [$PLUGIN_CONFIG, $DOCKER_PLUGIN_CONFIG]
+   --docker.purge                    docker should cleanup images [$PLUGIN_PURGE]
+   --repo.branch value               repository default branch [$DRONE_REPO_BRANCH]
+   --no-cache                        do not use cached intermediate containers [$PLUGIN_NO_CACHE]
+   --add-host value                  additional host:IP mapping [$PLUGIN_ADD_HOST]
+   --secret value                    secret key value pair eg id=MYSECRET [$PLUGIN_SECRET]
+   --secrets-from-env value          secret key value pair eg secret_name=secret [$PLUGIN_SECRETS_FROM_ENV]
+   --secrets-from-file value         secret key value pairs eg secret_name=/path/to/secret [$PLUGIN_SECRETS_FROM_FILE]
+   --drone-card-path value           card path location to write to [$DRONE_CARD_PATH]
+   --platform value                  platform value to pass to docker [$PLUGIN_PLATFORM]
+   --ssh-agent-key value             ssh agent key to use [$PLUGIN_SSH_AGENT_KEY]
+   --artifact-file value             Artifact file location that will be generated by the plugin. This file will include information of docker images that are uploaded by the plugin. [$PLUGIN_ARTIFACT_FILE]
+   --registry-type value             registry type [$PLUGIN_REGISTRY_TYPE]
+   --access-token value              access token [$ACCESS_TOKEN]
+   --help, -h                        show help
+   --version, -v                     print the version
+```
 
 ### Using Docker buildkit Secrets
 
@@ -84,10 +145,10 @@ name: default
 
 steps:
 - name: build dummy docker file and publish
-  image: plugins/docker
+  image: kit101z/dockerbuildkit
   pull: never
   settings:
-    repo: tphoney/test
+    repo: kit101z/test
     tags: latest
     secret: id=mysecret,src=secret-file
     username:
@@ -124,46 +185,21 @@ docker run --rm \
   -v $(pwd):$(pwd) \
   -w $(pwd) \
   --privileged \
-  plugins/docker --dry-run
+  kit101z/dockerbuildkit --dry-run
+
+# multi arch by bake file
+docker run --rm \
+  -e PLUGIN_TAG=latest \
+  -e PLUGIN_REPO=octocat/hello-world \
+  -e DRONE_COMMIT_SHA=d8dbe4d94f15fe89232e0402c6e8a0ddf21af3ab \
+  -e PLUGIN_BAKE_FILE=docker-bake.hcl \
+  -e PLUGIN_PLATFORM=linux/amd64,linux/arm64 \
+  -v $(pwd):$(pwd) \
+  -w $(pwd) \
+  --privileged \
+  kit101z/dockerbuildkit --dry-run
 ```
 
-### GAR (Google Artifact Registry)
-
-```yaml
-kind: pipeline
-name: default
-type: docker
-
-steps:
-  - name: push-to-gar
-    image: plugins/gar
-    pull: never
-    settings:
-      tag: latest
-      repo: project-id/repo/image-name
-      location: us
-      json_key:
-        from_secret: gcr_json_key
-```
-
-### GAR (Google Artifact Registry) using workload identity (OIDC)
-
-```yaml
-steps:
-  - name: push-to-gar
-    image: plugins/gar
-    pull: never
-    settings:
-      tag: latest
-      repo: project-id/repo/image-name
-      location: europe
-      project_number: project-number
-      pool_id: workload identity pool id
-      provider_id: workload identity provider id
-      service_account_email: service account email
-      oidc_token_id:
-        from_secret: token 
-```
 
 ## Developer Notes
 
@@ -175,7 +211,7 @@ steps:
 Run the changelog generator.
 
 ```BASH
-docker run -it --rm -v "$(pwd)":/usr/local/src/your-app githubchangeloggenerator/github-changelog-generator -u drone-plugins -p drone-docker -t <secret github token>
+GITHUB_TOKEN=<secret token> scripts/changelog.sh
 ```
 
 You can generate a token by logging into your GitHub account and going to Settings -> Personal access tokens.
@@ -185,7 +221,7 @@ Next we tag the PR's with the fixes or enhancements labels. If the PR does not f
 Run the changelog generator again with the future version according to semver.
 
 ```BASH
-docker run -it --rm -v "$(pwd)":/usr/local/src/your-app githubchangeloggenerator/github-changelog-generator -u drone-plugins -p drone-docker -t <secret token> --future-release v1.0.0
+GITHUB_TOKEN=<secret token> scripts/changelog.sh --future-release v1.0.0
 ```
 
 Create your pull request for the release. Get it merged then tag the release.

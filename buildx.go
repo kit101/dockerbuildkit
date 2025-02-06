@@ -38,7 +38,7 @@ func (p Plugin) createBuildxInstance() error {
 }
 
 func (p Plugin) destroyBuildxInstance() {
-	_ = traceRun(exec.Command(dockerExe, "buildx", "du"), os.Stdout)
+	//_ = traceRun(exec.Command(dockerExe, "buildx", "du"), os.Stdout)
 	_ = traceRun(exec.Command(dockerExe, "buildx", "prune", "-f", "-a"), os.Stdout)
 	_ = traceRun(exec.Command(dockerExe, "buildx", "rm"), os.Stdout)
 }
