@@ -35,9 +35,10 @@ type (
 
 	// Buildx defines Buildx parameters
 	Buildx struct {
-		BuildkitdConfig string // Buildx instance buildkitd-config
-		DriverOptImage  string // Buildx instance driver-opt image
-		Params          string // Buildx instance other params
+		BuildkitdConfig  string   // Buildx instance buildkitd-config
+		DriverOptImage   string   // Buildx instance driver-opt image
+		DriverOptNetwork string   // Buildx instance driver-opt network
+		Args             []string // Buildx instance other args
 	}
 
 	// Login defines Docker login parameters.

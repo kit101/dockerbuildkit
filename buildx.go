@@ -57,11 +57,14 @@ func (p Plugin) commandCreateBuildxInstance() *exec.Cmd {
 	if p.Buildx.DriverOptImage != "" {
 		args = append(args, "--driver-opt", "image="+p.Buildx.DriverOptImage)
 	}
+	if p.Buildx.DriverOptNetwork != "" {
+		args = append(args, "--driver-opt", "network="+p.Buildx.DriverOptNetwork)
+	}
 	if p.Buildx.BuildkitdConfig != "" {
 		args = append(args, "--buildkitd-config", p.Buildx.BuildkitdConfig)
 	}
-	if p.Buildx.Params != "" {
-		args = append(args, p.Buildx.Params)
+	if len(p.Buildx.Args) > 0 {
+		args = append(args, p.Buildx.Args...)
 	}
 	return exec.Command(dockerExe, args...)
 }

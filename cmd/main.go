@@ -64,9 +64,15 @@ func main() {
 			EnvVar: "DRONE_BUILDX_DRIVER_OPT_IMAGE",
 		},
 		cli.StringFlag{
-			Name:   "buildx.params",
-			Usage:  "buildx params. docker buildx create {}",
-			EnvVar: "DRONE_BUILDX_PARAMS",
+			Name:   "buildx.driver-opt.network",
+			Usage:  "buildx driver-opt network. docker buildx create --driver-opt network={}",
+			EnvVar: "DRONE_BUILDX_DRIVER_OPT_NETWORK",
+			//Value: "host",
+		},
+		cli.StringSliceFlag{
+			Name:   "buildx.args",
+			Usage:  "buildx args. docker buildx create {}",
+			EnvVar: "PLUGIN_BUILDX_ARGS",
 		},
 
 		// daemon
@@ -426,9 +432,10 @@ func run(c *cli.Context) error {
 			TagsVariableName: c.String("bake.tags-variable-name"),
 		},
 		Buildx: dockerbuildkit.Buildx{
-			BuildkitdConfig: c.String("buildx.buildkitd-config"),
-			DriverOptImage:  c.String("buildx.driver-opt.image"),
-			Params:          c.String("buildx.params"),
+			BuildkitdConfig:  c.String("buildx.buildkitd-config"),
+			DriverOptImage:   c.String("buildx.driver-opt.image"),
+			DriverOptNetwork: c.String("buildx.driver-opt.network"),
+			Args:             c.StringSlice("buildx.args"),
 		},
 		Daemon: dockerbuildkit.Daemon{
 			Registry:      c.String("docker.registry"),
