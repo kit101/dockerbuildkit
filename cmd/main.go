@@ -61,12 +61,12 @@ func main() {
 		cli.StringFlag{
 			Name:   "buildx.driver-opt.image",
 			Usage:  "buildx driver-opt image. docker buildx create --driver-opt image={}",
-			EnvVar: "DRONE_BUILDX_DRIVER_OPT_IMAGE",
+			EnvVar: "PLUGIN_BUILDX_DRIVER_OPT_IMAGE",
 		},
 		cli.StringFlag{
 			Name:   "buildx.driver-opt.network",
 			Usage:  "buildx driver-opt network. docker buildx create --driver-opt network={}",
-			EnvVar: "DRONE_BUILDX_DRIVER_OPT_NETWORK",
+			EnvVar: "PLUGIN_BUILDX_DRIVER_OPT_NETWORK",
 			//Value: "host",
 		},
 		cli.StringSliceFlag{
