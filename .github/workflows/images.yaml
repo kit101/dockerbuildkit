@@ -39,9 +39,9 @@ jobs:
       run: |
         GOOS=linux
         GOARCH=amd64
-        go build -v -ldflags "-X main.version=${GITHUB_SHA}" -a -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
+        go build -v -ldflags "-X main.version=${GITHUB_REF_NAME}.${GITHUB_SHA}" -a -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
         GOARCH=arm64
-        go build -v -ldflags "-X main.version=${GITHUB_SHA}" -a -tags netgo -o release/linux/arm64/dockerbuildkit ./cmd
+        go build -v -ldflags "-X main.version=${GITHUB_REF_NAME}.${GITHUB_SHA}" -a -tags netgo -o release/linux/arm64/dockerbuildkit ./cmd
 
     # Install the cosign tool except on PR
     # https://github.com/sigstore/cosign-installer
