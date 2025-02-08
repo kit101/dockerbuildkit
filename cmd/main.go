@@ -25,8 +25,8 @@ func main() {
 	}
 
 	app := cli.NewApp()
-	app.Name = "docker plugin"
-	app.Usage = "docker plugin"
+	app.Name = "dockerbuildkit"
+	app.Usage = "dockerbuildkit"
 	app.Action = run
 	app.Version = version
 	app.Flags = []cli.Flag{
