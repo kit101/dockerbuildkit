@@ -187,7 +187,7 @@ func main() {
 			Name:   "args-new",
 			Usage:  "build args new",
 			EnvVar: "PLUGIN_BUILD_ARGS_NEW",
-			Value:  new(CustomStringSliceFlag),
+			Value:  new(dockerbuildkit.CustomStringSliceFlag),
 		},
 		cli.BoolFlag{
 			Name:   "plugin-multiple-build-agrs",

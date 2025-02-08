@@ -1,8 +1,6 @@
-package main
+package dockerbuildkit
 
-import (
-	"strings"
-)
+import "strings"
 
 // CustomStringSliceFlag is like a regular StringSlice flag but with
 // semicolon as a delimiter
