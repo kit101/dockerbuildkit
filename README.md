@@ -4,7 +4,7 @@
 [![Go Doc](https://godoc.org/github.com/kit101/dockerbuildkit?status.svg)](http://godoc.org/github.com/kit101/dockerbuildkit)
 [![Go Report](https://goreportcard.com/badge/github.com/kit101/dockerbuildkit)](https://goreportcard.com/report/github.com/kit101/dockerbuildkit)
 
-Drone plugin uses Docker-in-Docker to build and publish Docker images to a container registry. For the usage information and a listing of the available options please take a look at [the docs](#Help info).
+Drone plugin uses Docker-in-Docker to build and publish Docker images to a container registry. For the usage information and a listing of the available options please take a look at [the docs](#Usage).
 
 ### Git Leaks
 
