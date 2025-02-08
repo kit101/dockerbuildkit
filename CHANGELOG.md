@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.4](https://github.com/kit101/dockerbuildkit/tree/1.1.4) (2025-02-08)
+
+[Full Changelog](https://github.com/kit101/dockerbuildkit/compare/1.1.3...1.1.4)
+
+**Merged pull requests:**
+
+- fixbug: buildx addtional options not yet effective [\#9](https://github.com/kit101/dockerbuildkit/pull/9) ([kit101](https://github.com/kit101))
+
 ## [1.1.3](https://github.com/kit101/dockerbuildkit/tree/1.1.3) (2025-01-24)
 
 [Full Changelog](https://github.com/kit101/dockerbuildkit/compare/1.1.2...1.1.3)
