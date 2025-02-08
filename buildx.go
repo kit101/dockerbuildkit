@@ -24,7 +24,7 @@ func (p Plugin) createBuildxInstance() error {
 		if err != nil {
 			return fmt.Errorf("generate buildkitd config[%s] error: %v", DefaultBuildkitdConfigPath, err)
 		}
-		err = traceRun(commandCatBuildkitdConfig(DefaultBuildkitdConfigPath), os.Stdout)
+		err = printBuildkitdConfig(DefaultBuildkitdConfigPath)
 		if err != nil {
 			return fmt.Errorf("print buildkitd config[%s] error: %v", DefaultBuildkitdConfigPath, err)
 		}
@@ -109,8 +109,18 @@ func generateBuildkitdConfig(mirrors []string, path string) error {
 	return nil
 }
 
-func commandCatBuildkitdConfig(path string) *exec.Cmd {
-	return exec.Command("cat", path)
+func printBuildkitdConfig(path string) error {
+	fmt.Printf("[info] %s: \n", path)
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(os.Stdout, f)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (p Plugin) doBake() error {
