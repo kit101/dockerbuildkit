@@ -52,27 +52,31 @@ func main() {
 			EnvVar: "DRONE_COMMIT_REF",
 		},
 
-		// buildx
+		// buildx create options
+		cli.BoolFlag{
+			Name:   "buildx.no-default-network",
+			Usage:  "buildx no-default-network. When this option is false, set --driver-opt network=host.",
+			EnvVar: "DRONE_BUILDX_NO_DEFAULT_NETWORK",
+		},
 		cli.StringFlag{
 			Name:   "buildx.buildkitd-config",
 			Usage:  "buildx buildkitd-config. docker buildx create --buildkitd-config {}. (default: /etc/buildkitd/buildkitd.toml)",
 			EnvVar: "DRONE_BUILDX_BUILDKITD_CONFIG",
 		},
 		cli.StringFlag{
-			Name:   "buildx.driver-opt.image",
-			Usage:  "buildx driver-opt image. docker buildx create --driver-opt image={}",
-			EnvVar: "PLUGIN_BUILDX_DRIVER_OPT_IMAGE",
-		},
-		cli.StringFlag{
-			Name:   "buildx.driver-opt.network",
-			Usage:  "buildx driver-opt network. docker buildx create --driver-opt network={}",
-			EnvVar: "PLUGIN_BUILDX_DRIVER_OPT_NETWORK",
-			//Value: "host",
+			Name:   "buildx.buildkitd-flags",
+			Usage:  "buildx buildkitd-flags. docker buildx create --buildkitd-flags {}.",
+			EnvVar: "DRONE_BUILDX_BUILDKITD_FLAGS",
 		},
 		cli.StringSliceFlag{
-			Name:   "buildx.args",
-			Usage:  "buildx args. docker buildx create {}",
-			EnvVar: "PLUGIN_BUILDX_ARGS",
+			Name:   "buildx.driver-opt",
+			Usage:  "buildx driver-opt. docker buildx create --driver-opt {}. see https://docs.docker.com/build/builders/drivers/docker-container/",
+			EnvVar: "PLUGIN_BUILDX_DRIVER_OPTS",
+		},
+		cli.StringSliceFlag{
+			Name:   "buildx.extra-option",
+			Usage:  "buildx args. docker buildx create {}. see docker buildx create --help",
+			EnvVar: "PLUGIN_BUILDX_ARGS,PLUGIN_BUILDX_EXTRA_OPTIONS",
 		},
 
 		// daemon
@@ -83,7 +87,7 @@ func main() {
 		},
 		cli.StringSliceFlag{
 			Name:   "daemon.mirrors",
-			Usage:  "multiple docker daemon registry mirrors, separated by commas",
+			Usage:  "multiple docker daemon registry mirrors, separated by commas. ",
 			EnvVar: "PLUGIN_MIRRORS,DOCKER_PLUGIN_MIRRORS",
 		},
 		cli.StringFlag{
@@ -432,10 +436,11 @@ func run(c *cli.Context) error {
 			TagsVariableName: c.String("bake.tags-variable-name"),
 		},
 		Buildx: dockerbuildkit.Buildx{
+			NoDefaultNetwork: c.Bool("buildx.no-default-network"),
 			BuildkitdConfig:  c.String("buildx.buildkitd-config"),
-			DriverOptImage:   c.String("buildx.driver-opt.image"),
-			DriverOptNetwork: c.String("buildx.driver-opt.network"),
-			Args:             c.StringSlice("buildx.args"),
+			BuildkitdFlags:   c.String("buildx.buildkitd-flags"),
+			DriverOpts:       c.StringSlice("buildx.driver-opt"),
+			ExtraOptions:     c.StringSlice("buildx.extra-option"),
 		},
 		Daemon: dockerbuildkit.Daemon{
 			Registry:      c.String("docker.registry"),
