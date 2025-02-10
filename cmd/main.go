@@ -479,6 +479,7 @@ func run(c *cli.Context) error {
 	}
 
 	err := plugin.Exec()
+	plugin.Destroy()
 	return err
 }
 
