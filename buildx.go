@@ -1,6 +1,7 @@
 package dockerbuildkit
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -12,13 +13,14 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/dchest/uniuri"
 	"github.com/duke-git/lancet/v2/fileutil"
+	"github.com/duke-git/lancet/v2/strutil"
 	"github.com/joho/godotenv"
 	resolverconfig "github.com/moby/buildkit/util/resolver/config"
 )
 
 const DefaultTagsVariableName = "TAGS"
 
-func (p Plugin) createBuildxInstance() error {
+func (p *Plugin) createBuildxInstance() error {
 	if p.Buildx.BuildkitdConfig == "" && len(p.Daemon.Mirrors) > 0 {
 		err := generateBuildkitdConfig(p.Daemon.Mirrors, DefaultBuildkitdConfigPath)
 		if err != nil {
@@ -30,20 +32,26 @@ func (p Plugin) createBuildxInstance() error {
 		}
 		p.Buildx.BuildkitdConfig = DefaultBuildkitdConfigPath
 	}
-	err := traceRun(p.commandCreateBuildxInstance(), io.Discard)
+
+	var out bytes.Buffer
+	err := traceRun(p.commandCreateBuildxInstance(), &out)
 	if err != nil {
 		return fmt.Errorf("can't create buildx builder instance: %v", err)
 	}
+	p.builder.name = strutil.Trim(out.String())
+	fmt.Printf("[info] builder name: %s\n", p.builder.name)
 	return err
 }
 
-func (p Plugin) destroyBuildxInstance() {
-	//_ = traceRun(exec.Command(dockerExe, "buildx", "du"), os.Stdout)
-	_ = traceRun(exec.Command(dockerExe, "buildx", "prune", "-f", "-a"), os.Stdout)
-	_ = traceRun(exec.Command(dockerExe, "buildx", "rm"), os.Stdout)
+func (p *Plugin) destroyBuildxInstance() {
+	if p.builder.name != "" {
+		//_ = traceRun(exec.Command(dockerExe, "buildx", "du", "--builder", p.builder.name), os.Stdout)
+		_ = traceRun(exec.Command(dockerExe, "buildx", "prune", "-f", "-a", "--builder", p.builder.name), os.Stdout)
+		_ = traceRun(exec.Command(dockerExe, "buildx", "rm", p.builder.name), os.Stdout)
+	}
 }
 
-func (p Plugin) commandCreateBuildxInstance() *exec.Cmd {
+func (p *Plugin) commandCreateBuildxInstance() *exec.Cmd {
 	//buildx create --driver docker-container --use --platform linux/amd64,linux/arm64 --buildkitd-config xxx
 	args := []string{
 		"buildx",
@@ -123,9 +131,9 @@ func printBuildkitdConfig(path string) error {
 	return nil
 }
 
-func (p Plugin) doBake() error {
+func (p *Plugin) doBake() error {
 	metadataFilePath := "/tmp/" + strings.ToLower(uniuri.New()) + "-metadata.json"
-	cmds := p.preBuild()
+	cmds := p.commandPreBuild()
 
 	err := p.Bake.loadEnvfile()
 	if err != nil {

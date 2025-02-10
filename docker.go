@@ -110,6 +110,9 @@ type (
 		BaseImageRegistry string // Docker registry to pull base image
 		BaseImageUsername string // Docker registry username to pull base image
 		BaseImagePassword string // Docker registry password to pull base image
+		builder           struct {
+			name string
+		}
 	}
 
 	Card []struct {
@@ -141,7 +144,7 @@ type (
 )
 
 // Exec executes the plugin step
-func (p Plugin) Exec() error {
+func (p *Plugin) Exec() error {
 	// handle buildkitd home
 	if os.Getenv(BuildkitdHomeEnvName) == "" {
 		wd, _ := os.Getwd()
@@ -178,15 +181,15 @@ func (p Plugin) Exec() error {
 	// credentials that have been provided.
 	switch {
 	case p.Login.Password != "" && p.Login.Config != "":
-		fmt.Println("Detected registry credentials and registry credentials file")
+		fmt.Println("[info] Detected registry credentials and registry credentials file")
 	case p.Login.Password != "":
-		fmt.Println("Detected registry credentials")
+		fmt.Println("[info] Detected registry credentials")
 	case p.Login.Config != "":
-		fmt.Println("Detected registry credentials file")
+		fmt.Println("[info] Detected registry credentials file")
 	case p.Login.AccessToken != "":
-		fmt.Println("Detected access token")
+		fmt.Println("[info] Detected access token")
 	default:
-		fmt.Println("Registry credentials or Docker config not provided. Guest mode enabled.")
+		fmt.Println("[info] Registry credentials or Docker config not provided. Guest mode enabled.")
 	}
 
 	// create Auth Config Files
@@ -208,10 +211,10 @@ func (p Plugin) Exec() error {
 
 	if p.BaseImageRegistry != "" {
 		if p.BaseImageUsername == "" {
-			fmt.Printf("Username cannot be empty. The base image connector requires authenticated access. Please either use an authenticated connector, or remove the base image connector.")
+			fmt.Printf("[info] Username cannot be empty. The base image connector requires authenticated access. Please either use an authenticated connector, or remove the base image connector.")
 		}
 		if p.BaseImagePassword == "" {
-			fmt.Printf("Password cannot be empty. The base image connector requires authenticated access. Please either use an authenticated connector, or remove the base image connector.")
+			fmt.Printf("[info] Password cannot be empty. The base image connector requires authenticated access. Please either use an authenticated connector, or remove the base image connector.")
 		}
 		var baseConnectorLogin Login
 		baseConnectorLogin.Registry = p.BaseImageRegistry
@@ -298,14 +301,16 @@ func (p Plugin) Exec() error {
 		for _, cmd := range cmds {
 			_ = traceRun(cmd, os.Stdout)
 		}
-
-		p.destroyBuildxInstance()
 	}
 
 	return nil
 }
 
-func (p Plugin) preBuild() []*exec.Cmd {
+func (p *Plugin) Destroy() {
+	p.destroyBuildxInstance()
+}
+
+func (p *Plugin) commandPreBuild() []*exec.Cmd {
 	var cmds []*exec.Cmd
 	cmds = append(cmds, commandVersion())               // docker version
 	cmds = append(cmds, commandInfo())                  // docker info
@@ -313,8 +318,8 @@ func (p Plugin) preBuild() []*exec.Cmd {
 	return cmds
 }
 
-func (p Plugin) doBuild() error {
-	cmds := p.preBuild()
+func (p *Plugin) doBuild() error {
+	cmds := p.commandPreBuild()
 
 	// pre-pull cache images
 	for _, img := range p.Build.CacheFrom {
