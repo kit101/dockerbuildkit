@@ -52,7 +52,6 @@ func (p *Plugin) destroyBuildxInstance() {
 }
 
 func (p *Plugin) commandCreateBuildxInstance() *exec.Cmd {
-	//buildx create --driver docker-container --use --platform linux/amd64,linux/arm64 --buildkitd-config xxx
 	args := []string{
 		"buildx",
 		"create",
@@ -62,18 +61,37 @@ func (p *Plugin) commandCreateBuildxInstance() *exec.Cmd {
 	if p.Build.Platform != "" {
 		args = append(args, "--platform", p.Build.Platform)
 	}
-	if p.Buildx.DriverOptImage != "" {
-		args = append(args, "--driver-opt", "image="+p.Buildx.DriverOptImage)
-	}
-	if p.Buildx.DriverOptNetwork != "" {
-		args = append(args, "--driver-opt", "network="+p.Buildx.DriverOptNetwork)
-	}
+
+	// --buildkit-config
 	if p.Buildx.BuildkitdConfig != "" {
 		args = append(args, "--buildkitd-config", p.Buildx.BuildkitdConfig)
 	}
-	if len(p.Buildx.Args) > 0 {
-		args = append(args, p.Buildx.Args...)
+	// --buildkitd-flags
+	if p.Buildx.BuildkitdFlags != "" {
+		args = append(args, "--buildkitd-flags", p.Buildx.BuildkitdFlags)
 	}
+
+	// driver-opt
+	var driverOpts []string
+	if p.Buildx.NoDefaultNetwork {
+		driverOpts = p.Buildx.DriverOpts
+	} else {
+		for _, opt := range p.Buildx.DriverOpts {
+			if strings.HasPrefix(opt, "network=") {
+				fmt.Printf("[warning] using default network mode: network=host")
+			} else {
+				driverOpts = append(driverOpts, opt)
+			}
+		}
+		driverOpts = append(driverOpts, "network=host")
+	}
+	for _, opt := range driverOpts {
+		args = append(args, "--driver-opt", opt)
+	}
+
+	// extra options
+	args = append(args, p.Buildx.ExtraOptions...)
+
 	return exec.Command(dockerExe, args...)
 }
 
