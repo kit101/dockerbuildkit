@@ -30,18 +30,22 @@ jobs:
 
     # Set up Golang
     - name: Set up Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v5
       with:
-        go-version: 1.22
+        go-version-file: go.mod
 
     # Golang build artifacts
     - name: Build
       run: |
-        GOOS=linux
-        GOARCH=amd64
-        go build -v -ldflags "-X main.version=${GITHUB_REF_NAME}.${GITHUB_SHA}" -a -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
-        GOARCH=arm64
-        go build -v -ldflags "-X main.version=${GITHUB_REF_NAME}.${GITHUB_SHA}" -a -tags netgo -o release/linux/arm64/dockerbuildkit ./cmd
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -ldflags "-X main.version=${GITHUB_REF_NAME}.${GITHUB_SHA}" -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
+        CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -v -ldflags "-X main.version=${GITHUB_REF_NAME}.${GITHUB_SHA}" -tags netgo -o release/linux/arm64/dockerbuildkit ./cmd
+
+    # Check the executable itself; a multi-platform image index cannot detect
+    # an amd64 binary accidentally copied into the arm64 image.
+    - name: Verify binary architectures
+      run: |
+        file release/linux/amd64/dockerbuildkit | grep 'ELF 64-bit LSB.*x86-64.*statically linked'
+        file release/linux/arm64/dockerbuildkit | grep 'ELF 64-bit LSB.*ARM aarch64.*statically linked'
 
     # Install the cosign tool except on PR
     # https://github.com/sigstore/cosign-installer
