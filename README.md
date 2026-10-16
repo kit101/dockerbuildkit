@@ -19,13 +19,14 @@ chmod +x ./git-hooks/install.sh
 Build the binaries with the following commands:
 
 ```console
-export GOOS=linux
-export GOARCH=amd64
-export CGO_ENABLED=0
-export GO111MODULE=on
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -v -tags netgo -o release/linux/arm64/dockerbuildkit ./cmd
 
-go build -v -a -tags netgo -o release/linux/amd64/dockerbuildkit ./cmd
+file release/linux/amd64/dockerbuildkit
+file release/linux/arm64/dockerbuildkit
 ```
+
+Both binaries must be statically linked Linux ELF executables, with `x86-64` for amd64 and `ARM aarch64` for arm64. Check the binaries before building or publishing images; image platform metadata alone does not verify the architecture of the executable inside.
 
 ## Docker
 
